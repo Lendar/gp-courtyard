@@ -58,12 +58,12 @@ module.exports = (grunt) ->
     load_csv:
       poll:
         files: [
-          src: 'poll357.csv'
+          src: 'poll1685.csv'
         ]
     save_geojson:
       poll:
         files: [
-          dest: 'poll357.geojson'
+          dest: 'poll1685.geojson'
         ]
 
   grunt.registerMultiTask 'load_csv', 'Load poll CSV', ->

@@ -1,10 +1,21 @@
 request = require 'request'
 fs = require 'fs'
+dirty = require 'dirty'
+geocache = dirty 'geocache.db'
+geocache.on 'load', -> geocache.loaded = 1
 
 queryAddress = (address, callback) ->
-  url = "https://maps.googleapis.com/maps/api/geocode/json?address=#{address}&sensor=false"
-  request {url, json: true}, (err, res, body) ->
-    callback err, body
+  cached_body = geocache.get address
+  return if cached_body
+  url = "https://maps.googleapis.com/maps/api/geocode/json"
+  qs = {address, sensor: 'false'}
+  setTimeout ->
+    console.log 15
+    request {url, qs, json: true}, (err, res, body) ->
+      console.log 13
+      geocache.set address, body
+      callback err, body
+  , 2000
 
 processRecord = (record, done) ->
   address_hint = 'Москва '
@@ -63,10 +74,11 @@ module.exports = (grunt) ->
 
   grunt.registerTask 'geocode', 'Try Logging', ->
     done = @async()
+    unless geocache.loaded
+      grunt.fail.fatal 'Geocache is not ready'
     grunt.config.requires 'records'
     records = grunt.config.get 'records'
     grunt.log.writeln 'Geocode', records?.length, 'records'
-    records = records
     processRecords records, (err, points) ->
       if err
         grunt.fail.fatal 'No records'

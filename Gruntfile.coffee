@@ -6,13 +6,12 @@ geocache.on 'load', -> geocache.loaded = 1
 
 queryAddress = (address, callback) ->
   cached_body = geocache.get address
-  return if cached_body
+  if cached_body
+    return callback null, cached_body
   url = "https://maps.googleapis.com/maps/api/geocode/json"
   qs = {address, sensor: 'false'}
   setTimeout ->
-    console.log 15
     request {url, qs, json: true}, (err, res, body) ->
-      console.log 13
       geocache.set address, body
       callback err, body
   , 2000
@@ -20,7 +19,7 @@ queryAddress = (address, callback) ->
 processRecord = (record, done) ->
   address_hint = 'Москва '
   address = record[5]
-  console.log 'q', address
+  console.log '🔎 ', address
   queryAddress address_hint + address, (err, body) ->
     if err
       done err
@@ -52,12 +51,12 @@ module.exports = (grunt) ->
     load_csv:
       poll:
         files: [
-          src: 'poll8.csv'
+          src: 'poll357.csv'
         ]
     save_geojson:
       poll:
         files: [
-          dest: 'poll8.geojson'
+          dest: 'poll357.geojson'
         ]
 
   grunt.registerMultiTask 'load_csv', 'Load poll CSV', ->

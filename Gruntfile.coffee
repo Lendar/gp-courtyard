@@ -18,7 +18,7 @@ queryAddress = (address, callback) ->
 
 processRecord = (record, done) ->
   address_hint = 'Москва '
-  address = record[5]
+  address = record.address
   console.log '🔎 ', address
   queryAddress address_hint + address, (err, body) ->
     if err
@@ -28,7 +28,9 @@ processRecord = (record, done) ->
       # location = body?.results?[0]?.geometry?.viewport?.northeast
       location = body?.results?[0]?.geometry?.location
       if location?.lat? and location?.lng?
-        done null, location
+        # record.lat = location.lat
+        # record.lng = location.lng
+        done null, {record, lat: location.lat, lng: location.lng}
       else
         done null, null
 
@@ -44,6 +46,11 @@ processRecords = (records, done, results=[]) ->
         processRecords records, done, results
   else
     done null, results
+
+columns =
+  'Адрес вашего двора': 'address'
+  'Оцените по шкале от 1 до 10 качество озеленения у вас во дворе': 'zelen'
+numeric_columns = ['zelen']
 
 module.exports = (grunt) ->
 
@@ -65,7 +72,15 @@ module.exports = (grunt) ->
     filename = @files[0].src[0]
     grunt.log.writeln 'Load CSV', filename
     csv()
-    .from.path(filename, columns: false)
+    .from.path(filename, columns: true)
+    .transform (row) ->
+      new_row = {}
+      for key, value of row
+        to = columns[key]
+        if to
+          value = parseInt value if to is 'zelen'
+          new_row[to] = value
+      return new_row
     .to.array (records) ->
       grunt.log.writeln 'Read', records.length, 'records'
       grunt.config.set 'records', records
@@ -73,17 +88,19 @@ module.exports = (grunt) ->
 
   grunt.registerTask 'geocode', 'Try Logging', ->
     done = @async()
-    unless geocache.loaded
-      grunt.fail.fatal 'Geocache is not ready'
-    grunt.config.requires 'records'
-    records = grunt.config.get 'records'
-    grunt.log.writeln 'Geocode', records?.length, 'records'
-    processRecords records, (err, points) ->
-      if err
-        grunt.fail.fatal 'No records'
-      else
-        grunt.config.set 'points', points
-      done err
+    setTimeout ->
+      unless geocache.loaded
+        grunt.fail.fatal 'Geocache is not ready'
+      grunt.config.requires 'records'
+      records = grunt.config.get 'records'
+      grunt.log.writeln 'Geocode', records?.length, 'records'
+      processRecords records, (err, points) ->
+        if err
+          grunt.fail.fatal 'No records'
+        else
+          grunt.config.set 'points', points
+        done err
+    , 1000
 
   grunt.registerMultiTask 'save_geojson', 'Save points to .geojson', ->
     done = @async()
@@ -102,9 +119,8 @@ module.exports = (grunt) ->
           type: 'Point'
           coordinates: [lng, lat]
         }
-        properties:
-          prop0: '1'
-      } for {lng, lat} in points)
+        properties: record
+      } for {lng, lat, record} in points)
 
     fs.writeFile dest, JSON.stringify(geo), done
 

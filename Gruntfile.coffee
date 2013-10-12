@@ -47,6 +47,18 @@ processRecords = (records, done, results=[]) ->
   else
     done null, results
 
+gridRect = (lng, lat, size) ->
+  sizex = size
+  sizey = size / 2
+  xi = Math.floor(lng / sizex)
+  yi = Math.floor(lat / sizey)
+  x1 = xi * sizex
+  x2 = x1 + sizex
+  y1 = yi * sizey
+  y2 = y1 + sizey
+  [[x1, y1], [x1, y2], [x2, y2], [x2, y1], [x1, y1]]
+
+
 columns =
   'Адрес вашего двора': 'address'
   'Оцените по шкале от 1 до 10 качество озеленения у вас во дворе': 'zelen'
@@ -118,6 +130,13 @@ module.exports = (grunt) ->
         geometry: {
           type: 'Point'
           coordinates: [lng, lat]
+        }
+        properties: record
+      } for {lng, lat, record} in points).concat({
+        type: 'Feature'
+        geometry: {
+          type: 'Polygon'
+          coordinates: [gridRect(lng, lat, 0.006)]
         }
         properties: record
       } for {lng, lat, record} in points)

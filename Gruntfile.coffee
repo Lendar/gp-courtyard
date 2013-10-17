@@ -65,7 +65,7 @@ columns =
   'Оцените по шкале от 1 до 10 качество озеленения у вас во дворе': 'zelen'
   'Оцените по шкале от 1 до 10 приспособленность вашего двора для маломобильных групп населения - пенсионеров, инвалидов, родителей с детскими колясками, велосипедистов?': 'access'
   'По шкале от 1 до 10, принимая во внимание все характеристики двора, оцените ваш двор': 'total'
-numeric_columns = ['zelen']
+numeric_columns = ['zelen', 'car', 'access', 'total']
 
 module.exports = (grunt) ->
 
@@ -73,12 +73,12 @@ module.exports = (grunt) ->
     load_csv:
       poll:
         files: [
-          src: 'poll1685.csv'
+          src: 'poll1794.csv'
         ]
     save_geojson:
       poll:
         files: [
-          dest: 'poll1685.geojson'
+          dest: 'poll1794.geojson'
         ]
 
   grunt.registerMultiTask 'load_csv', 'Load poll CSV', ->
@@ -93,7 +93,7 @@ module.exports = (grunt) ->
       for key, value of row
         to = columns[key]
         if to
-          value = parseInt value if to is 'zelen'
+          value = parseInt value if to in numeric_columns
           new_row[to] = value
       return new_row
     .to.array (records) ->
@@ -135,14 +135,15 @@ module.exports = (grunt) ->
           coordinates: [lng, lat]
         }
         properties: record
-      } for {lng, lat, record} in points).concat({
-        type: 'Feature'
-        geometry: {
-          type: 'Polygon'
-          coordinates: [gridRect(lng, lat, 0.006)]
-        }
-        properties: record
       } for {lng, lat, record} in points)
+      # .concat({
+      #   type: 'Feature'
+      #   geometry: {
+      #     type: 'Polygon'
+      #     coordinates: [gridRect(lng, lat, 0.006)]
+      #   }
+      #   properties: record
+      # } for {lng, lat, record} in points)
 
     fs.writeFile dest, JSON.stringify(geo), done
 

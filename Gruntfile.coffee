@@ -27,10 +27,12 @@ processRecord = (record, done) ->
       # console.log body?.results?[0]?.geometry
       # location = body?.results?[0]?.geometry?.viewport?.northeast
       location = body?.results?[0]?.geometry?.location
+      precision = body?.results?[0]?.geometry?.location_type
       if location?.lat? and location?.lng?
         # record.lat = location.lat
         # record.lng = location.lng
-        done null, {record, lat: location.lat, lng: location.lng}
+        record.precision = precision
+        done null, {record, lat: location.lat, lng: location.lng, has_address: !!address}
       else
         done null, null
 
@@ -91,7 +93,7 @@ module.exports = (grunt) ->
     .transform (row) ->
       new_row = {}
       for key, value of row
-        to = columns[key]
+        to = columns[key.trim()]
         if to
           value = parseInt value if to in numeric_columns
           new_row[to] = value
@@ -124,7 +126,6 @@ module.exports = (grunt) ->
     dest = @files[0].dest
     unless dest?
       grunt.fail.fatal 'No dest'
-    grunt.log.writeln 'Save', points?.length, 'points to', dest
 
     geo =
       type: 'FeatureCollection'
@@ -135,7 +136,7 @@ module.exports = (grunt) ->
           coordinates: [lng, lat]
         }
         properties: record
-      } for {lng, lat, record} in points)
+      } for {lng, lat, record, has_address} in points when has_address and record.precision isnt 'APPROXIMATE')
       # .concat({
       #   type: 'Feature'
       #   geometry: {
@@ -144,6 +145,7 @@ module.exports = (grunt) ->
       #   }
       #   properties: record
       # } for {lng, lat, record} in points)
+    grunt.log.writeln 'Save', geo.features.length, 'points to', dest
 
     fs.writeFile dest, JSON.stringify(geo), done
 

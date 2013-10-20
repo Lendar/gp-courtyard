@@ -1,5 +1,7 @@
 request = require 'request'
+{exec} = require 'child_process'
 fs = require 'fs'
+path = require 'path'
 dirty = require 'dirty'
 geocache = dirty 'geocache.db'
 geocache.on 'load', -> geocache.loaded = 1
@@ -70,6 +72,7 @@ columns =
 numeric_columns = ['zelen', 'car', 'access', 'total']
 
 module.exports = (grunt) ->
+  _ = grunt.util._
 
   grunt.initConfig
     load_csv:
@@ -82,6 +85,25 @@ module.exports = (grunt) ->
         files: [
           dest: 'poll1794.geojson'
         ]
+    query_arcgis:
+      districts:
+        dest: 'gen/districts.geojson.part'
+        urls: [
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A3913575.848189838%2C%22ymin%22%3A7511529.185500466%2C%22xmax%22%3A4070118.882117804%2C%22ymax%22%3A7668072.219428432%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579__1_153._jsonpCallback'
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A4070118.882117804%2C%22ymin%22%3A7511529.185500466%2C%22xmax%22%3A4226661.91604577%2C%22ymax%22%3A7668072.219428432%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579__1_154._jsonpCallback'
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A4226661.91604577%2C%22ymin%22%3A7511529.185500466%2C%22xmax%22%3A4383204.949973736%2C%22ymax%22%3A7668072.219428432%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579__1_155._jsonpCallback'
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A3913575.848189838%2C%22ymin%22%3A7354986.1515725%2C%22xmax%22%3A4070118.882117804%2C%22ymax%22%3A7511529.185500466%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579_0_153._jsonpCallback'
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A4070118.882117804%2C%22ymin%22%3A7354986.1515725%2C%22xmax%22%3A4226661.91604577%2C%22ymax%22%3A7511529.185500466%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579_0_154._jsonpCallback'
+          'http://api.atlas.mos.ru/arcgis/rest/services/Basemaps/egipdata/MapServer/223/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&maxAllowableOffset=305&geometry=%7B%22xmin%22%3A4226661.91604577%2C%22ymin%22%3A7354986.1515725%2C%22xmax%22%3A4383204.949973736%2C%22ymax%22%3A7511529.185500466%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=102100&callback=dojo.io.script.jsonp_dojoIoScript_Granici_rayonov_EDS2234_305_7481131405579_0_155._jsonpCallback'
+        ]
+    merge_geojson:
+      districts:
+        files: [{
+          src: 'gen/districts.geojson.part*'
+          dest: 'gen/districts.geojson'
+          pretty: true
+        }]
+
 
   grunt.registerMultiTask 'load_csv', 'Load poll CSV', ->
     done = @async()
@@ -149,8 +171,50 @@ module.exports = (grunt) ->
 
     fs.writeFile dest, JSON.stringify(geo), done
 
+  grunt.registerMultiTask 'query_arcgis', 'Query Arcgis servers', ->
+    done = @async()
+    urls = @data.urls
+    dest = @data.dest
+    left = urls.length
+    grunt.log.writeln 'Run ogr2ogr for', left, 'zones'
+    grunt.file.mkdir path.dirname dest
+    for url, index in urls
+      url = url.replace(/&callback=.*$/, '')
+      filepath = "#{dest}#{index}"
+      grunt.log.writeln 'Download to', filepath
+      grunt.file.delete "#{dest}#{index}"
+      cmd = "ogr2ogr -f GeoJSON #{dest}#{index} \"#{url}\""
+      grunt.verbose.writeln 'Run', cmd
+      exec cmd, (err, res) ->
+        if err
+          grunt.fail.warn err
+        if res
+          grunt.log.writeln res
+        left--
+        done() unless left
+        grunt.verbose.writeln 'Left', left
+
+  grunt.registerMultiTask 'merge_geojson', 'Merge geojson features', ->
+    grunt.verbose.writeln 'merge', @files.length
+    @files.forEach (file) ->
+      merged_json = file.src.map (filepath) ->
+        grunt.verbose.writeln 'read', filepath
+        grunt.file.readJSON filepath
+      .reduce (a, b) ->
+        c = _.clone a
+        c.features = [].concat a.features, b.features
+        return c
+      grunt.log.writeln 'Save', file.dest
+      raw = if file.pretty
+        JSON.stringify(merged_json, null, 2)
+      else
+        JSON.stringify(merged_json)
+      grunt.file.write file.dest, raw
+
   grunt.registerTask 'default', [
     'load_csv'
     'geocode'
     'save_geojson'
+    'query_arcgis:districts'
+    'merge_geojson:districts'
   ]

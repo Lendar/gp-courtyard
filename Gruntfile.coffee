@@ -2,6 +2,7 @@ request = require 'request'
 {exec} = require 'child_process'
 fs = require 'fs'
 path = require 'path'
+gju = require 'geojson-utils'
 dirty = require 'dirty'
 geocache = dirty 'geocache.db'
 geocache.on 'load', -> geocache.loaded = 1
@@ -102,6 +103,14 @@ module.exports = (grunt) ->
           src: 'gen/districts.geojson.part*'
           dest: 'gen/districts.geojson'
           pretty: true
+        }]
+    add_column:
+      districts:
+        files: [{
+          points: 'gen/poll1794.geojson'
+          polygons: 'gen/districts.geojson'
+          dest: 'gen/poll1794-districts.geojson'
+          property: 'district'
         }]
 
 
@@ -211,10 +220,33 @@ module.exports = (grunt) ->
         JSON.stringify(merged_json)
       grunt.file.write file.dest, raw
 
+  grunt.registerMultiTask 'add_column', 'Add district property to points', ->
+    @files.forEach (file) =>
+      points = grunt.file.readJSON file.points
+      polygons = grunt.file.readJSON file.polygons
+      grunt.log.writeln 'Read', points.features.length, 'points'
+      grunt.log.writeln 'Read', polygons.features.length, 'polygons'
+      stat = {matched: 0, total: 0}
+      for point in points.features
+        grunt.verbose.debug 'poly', polygons.features[0].geometry.coordinates
+        grunt.verbose.debug 'point', point.geometry
+        matches =
+          for poly in polygons.features when gju.pointInPolygon point.geometry, poly.geometry
+            poly
+        grunt.verbose.debug 'match', matches.length, '/', polygons.features.length, point.properties.address
+        stat.total++
+        if matches.length
+          grunt.log.debug 'Match', matches[0]
+          point.properties[file.property] = matches[0]
+          stat.matched++
+      grunt.log.writeln "Processed: #{stat.total}. Found: #{stat.matched}."
+      grunt.file.write file.dest, JSON.stringify(points)
+
   grunt.registerTask 'default', [
     'load_csv'
     'geocode'
     'save_geojson'
     'query_arcgis:districts'
     'merge_geojson:districts'
+    'add_column:districts'
   ]

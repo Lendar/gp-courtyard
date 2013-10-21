@@ -83,7 +83,7 @@ module.exports = (grunt) ->
     save_geojson:
       poll:
         files: [
-          dest: 'poll1794.geojson'
+          dest: 'gen/poll1794.geojson'
         ]
     query_arcgis:
       districts:
@@ -145,31 +145,31 @@ module.exports = (grunt) ->
     done = @async()
     grunt.config.requires 'points'
     points = grunt.config.get 'points'
-    dest = @files[0].dest
-    unless dest?
-      grunt.fail.fatal 'No dest'
+    @files.forEach (file) ->
+      geo =
+        type: 'FeatureCollection'
+        features: ({
+          type: 'Feature'
+          geometry: {
+            type: 'Point'
+            coordinates: [lng, lat]
+          }
+          properties: record
+        } for {lng, lat, record, has_address} in points when has_address and record.precision isnt 'APPROXIMATE')
 
-    geo =
-      type: 'FeatureCollection'
-      features: ({
-        type: 'Feature'
-        geometry: {
-          type: 'Point'
-          coordinates: [lng, lat]
-        }
-        properties: record
-      } for {lng, lat, record, has_address} in points when has_address and record.precision isnt 'APPROXIMATE')
-      # .concat({
-      #   type: 'Feature'
-      #   geometry: {
-      #     type: 'Polygon'
-      #     coordinates: [gridRect(lng, lat, 0.006)]
-      #   }
-      #   properties: record
-      # } for {lng, lat, record} in points)
-    grunt.log.writeln 'Save', geo.features.length, 'points to', dest
+      if file.rect
+        geo.features = geo.features.concat({
+          type: 'Feature'
+          geometry: {
+            type: 'Polygon'
+            coordinates: [gridRect(lng, lat, 0.006)]
+          }
+          properties: record
+        } for {lng, lat, record} in points)
 
-    fs.writeFile dest, JSON.stringify(geo), done
+      grunt.log.writeln 'Save', geo.features.length, 'points to', file.dest
+      grunt.file.mkdir path.dirname file.dest
+      grunt.file.write file.dest, JSON.stringify(geo), done
 
   grunt.registerMultiTask 'query_arcgis', 'Query Arcgis servers', ->
     done = @async()

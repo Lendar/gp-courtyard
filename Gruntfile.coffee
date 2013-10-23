@@ -63,6 +63,10 @@ gridRect = (lng, lat, size) ->
   y2 = y1 + sizey
   [[x1, y1], [x1, y2], [x2, y2], [x2, y1], [x1, y1]]
 
+average = (arr) ->
+  sum = 0
+  sum += x for x in arr
+  sum / arr.length
 
 columns =
   'Адрес вашего двора': 'address'
@@ -217,6 +221,12 @@ module.exports = (grunt) ->
         c = _.clone a
         c.features = [].concat a.features, b.features
         return c
+      grunt.verbose.writeln 'Found', merged_json.features.length
+      uniq_features = _.uniq merged_json.features, false, (x) -> x.properties.NAME
+      grunt.verbose.writeln 'Unique', uniq_features.length
+      removed_num = uniq_features.length - merged_json.features.length
+      grunt.log.writeln "Removed #{removed_num} duplicates" if removed_num
+      merged_json.features = uniq_features
       grunt.log.writeln 'Save', file.dest
       raw = if file.pretty
         JSON.stringify(merged_json, null, 2)
@@ -232,8 +242,8 @@ module.exports = (grunt) ->
       grunt.log.writeln 'Read', polygons.features.length, 'polygons'
       stat = {matched: 0, total: 0}
       for point in points.features
-        grunt.verbose.debug 'poly', polygons.features[0].geometry.coordinates
-        grunt.verbose.debug 'point', point.geometry
+        grunt.verbose.debug 'poly.geo', polygons.features[0].geometry.coordinates
+        grunt.verbose.debug 'point.geo', point.geometry
         matches =
           for poly in polygons.features when gju.pointInPolygon point.geometry, poly.geometry
             poly
@@ -241,10 +251,22 @@ module.exports = (grunt) ->
         stat.total++
         if matches.length
           grunt.log.debug 'Match', matches[0]
-          point.properties[file.property] = matches[0]
+          if matches.length > 1
+            grunt.log.warn 'Too many matches', _.pluck(_.pluck(matches, 'properties'), 'NAME')
+          poly = matches[0]
+          # _.findWhere polygons, name: matches[0].properties.NAME
+          grunt.verbose.debug 'point', point
+          grunt.verbose.debug 'poly', poly
+          for col in numeric_columns
+            arr = poly.properties[col] ?= []
+            arr.push point.properties[col]
+          point.properties[file.property] =
           stat.matched++
+      for poly in polygons.features
+        for col in numeric_columns
+          poly.properties[col] = Math.round average(poly.properties[col] ? [])
       grunt.log.writeln "Processed: #{stat.total}. Found: #{stat.matched}."
-      grunt.file.write file.dest, JSON.stringify(points)
+      grunt.file.write file.dest, JSON.stringify(polygons)
 
   grunt.registerTask 'default', [
     'load_csv'

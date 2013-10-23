@@ -22,7 +22,7 @@ queryAddress = (address, callback) ->
 processRecord = (record, done) ->
   address_hint = 'Москва '
   address = record.address
-  console.log '🔎 ', address
+  # console.log '🔎 ', address
   queryAddress address_hint + address, (err, body) ->
     if err
       done err
@@ -178,7 +178,8 @@ module.exports = (grunt) ->
 
       grunt.log.writeln 'Save', geo.features.length, 'points to', file.dest
       grunt.file.mkdir path.dirname file.dest
-      grunt.file.write file.dest, JSON.stringify(geo), done
+      grunt.file.write file.dest, JSON.stringify(geo)
+      done()
 
   grunt.registerMultiTask 'query_arcgis', 'Query Arcgis servers', ->
     done = @async()
@@ -192,7 +193,10 @@ module.exports = (grunt) ->
       filepath = "#{dest}#{index}"
       grunt.log.writeln 'Download to', filepath
       grunt.file.delete "#{dest}#{index}"
-      cmd = "ogr2ogr -f GeoJSON #{dest}#{index} \"#{url}\""
+      cmd = """ogr2ogr -f GeoJSON #{dest}#{index} "#{url}"
+      -s_srs 6928.wkt
+      -t_srs EPSG:4326
+      """.replace(/\n/g, ' ')
       grunt.verbose.writeln 'Run', cmd
       exec cmd, (err, res) ->
         if err
@@ -250,3 +254,7 @@ module.exports = (grunt) ->
     'merge_geojson:districts'
     'add_column:districts'
   ]
+
+unless module.parent
+  exec '''grunt && cp gen/districts.geojson ~/Documents/MapBox/project/gp-courtyard/layers/districts.geojson && touch ~/Documents/MapBox/project/gp-courtyard/style.mss''', (err, res) ->
+    console.log  err, res

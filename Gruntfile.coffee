@@ -258,13 +258,16 @@ module.exports = (grunt) ->
           grunt.verbose.debug 'point', point
           grunt.verbose.debug 'poly', poly
           for col in numeric_columns
-            arr = poly.properties[col] ?= []
+            arr = poly.properties[col + '_arr'] ?= []
             arr.push point.properties[col]
           point.properties[file.property] =
           stat.matched++
       for poly in polygons.features
         for col in numeric_columns
-          poly.properties[col] = Math.round average(poly.properties[col] ? [])
+          arr = _.compact(poly.properties[col + '_arr']) ? []
+          poly.properties[col + '_num'] = arr.length
+          poly.properties[col] = Math.round average(arr)
+          grunt.log.debug 'poly.properties', poly.properties
       grunt.log.writeln "Processed: #{stat.total}. Found: #{stat.matched}."
       grunt.file.write file.dest, JSON.stringify(polygons)
 
